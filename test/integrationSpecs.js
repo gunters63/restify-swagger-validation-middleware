@@ -1,25 +1,37 @@
 'use strict';
 
-const middleware = require('../');
+const _ = require('lodash');
 const expect = require('chai').expect;
 const restify = require('restify');
 const supertest = require('supertest-as-promised');
+const SwaggerParser = require('swagger-parser');
 
-var PORT = process.env.UNIT_TEST_PORT || 8080;
+const middleware = require('../');
+
+let PORT = process.env.UNIT_TEST_PORT || 8080;
+const swaggerStub = {
+  swagger: '2.0',
+  info: {title: 'test', version: '1.0'}
+};
 
 describe('middleware', function () {
   let server;
   let request;
 
-  beforeEach('Starting restify server', function (done) {
+  beforeEach('starting restify server', function (done) {
     server = restify.createServer();
+    // validation middleware requires query and body parser to be used,
+    // both have to disable mapping their properties into req.params
+    server.use(restify.queryParser({mapParams: false}));
+    server.use(restify.bodyParser({mapParams: false}));
+
     server.listen(PORT, '127.0.0.1', () => {
       request = supertest(server);
       done();
     })
   });
 
-  afterEach('Stopping restify server', function (done) {
+  afterEach('stopping restify server', function (done) {
     try {
       server.close(function () {
         server = null;
@@ -32,68 +44,138 @@ describe('middleware', function () {
     }
   });
 
-  it('Returns bad request status when swagger validation information is missing', function () {
+  it('returns bad request status when swagger validation information is missing', function () {
     server.use(middleware());
-    server.get('/users/:id', (req, res, next) => next);
+    server.get('/test', (req, res) => res.send(200));
     return request
-      .get('/users/12')
+      .get('/test')
       .expect(400)
   });
 
-  it.only('Returns bad request when required query parameter is missing', function () {
-    server.use(middleware(null, {
+  it('should not validate when a required query parameter is missing', function () {
+    let myAPI = _.assign({}, swaggerStub, {
       paths: {
-        '/users/{id}': {
+        '/test': {
           get: {
-            parameters: {name: 'test', type: 'string', in: 'query', required: true}
+            parameters: [{name: 'test', type: 'integer', in: 'query', required: true}],
+            responses: {'200': {description: 'no content'}}
           }
         }
       }
-    }));
-    server.get('/users/:id', (req, res, next) => next);
-    return request
-      .get('/users/12')
-      .expect(400)
+    });
+    return SwaggerParser.validate(myAPI)
+      .then((swaggerAPI) => {
+        server.use(middleware(null, swaggerAPI));
+        server.get('/test', (req, res) => res.send(200));
+        return request
+          .get('/test?no_test=1')
+          .expect(400)
+      })
   });
 
-  it('Returns bad request when the POST body does not follow the given schema', function () {
-    server.use(middleware(null, {
+  it('should validate when a required query parameter exists', function () {
+    let myAPI = _.assign({}, swaggerStub, {
       paths: {
-        '/users': {
-          post: {
-            parameters: {
-              name: 'test', in: 'body', schema: {
-                type: 'object', properties: {id: {type: 'integer'}}
-              }
-            }
+        '/test': {
+          get: {
+            parameters: [{name: 'test', type: 'integer', in: 'query', required: true}],
+            responses: {'200': {description: 'no content'}}
           }
         }
       }
-    }));
-    return request
-      .post('/users')
-      .send({no_id: 1})
-      .expect(400)
+    });
+    return SwaggerParser.validate(myAPI)
+      .then((swaggerAPI) => {
+        server.use(middleware(null, swaggerAPI));
+        server.get('/test', (req, res) => res.send(200));
+        return request
+          .get('/test?test=1')
+          .expect(200)
+      })
   });
 
-  it('Validates ok when the POST body follows the given schema', function () {
-    server.use(middleware(null, {
+  it('validates route params and query parameters at the same time', function () {
+    let myAPI = _.assign({}, swaggerStub, {
       paths: {
-        '/users': {
-          post: {
-            parameters: {
-              name: 'test', in: 'body', schema: {
-                type: 'object', properties: {id: {type: 'integer'}}
-              }
-            }
+        '/test/{id}': {
+          parameters: [{name: 'id', type: 'string', in: 'path', required: true}],
+          get: {
+            parameters: [{name: 'test', type: 'integer', in: 'query', required: true}],
+            responses: {'200': {description: 'no content'}}
           }
         }
       }
-    }));
-    return request
-      .post('/users')
-      .send({id: 1})
-      .expect(400)
+    });
+    return SwaggerParser.validate(myAPI)
+      .then((swaggerAPI) => {
+        server.use(middleware(null, swaggerAPI));
+        server.get('/test/:id', (req, res) => res.send(200));
+        return request
+          .get('/test/12?test=1')
+          .expect(200)
+      })
+  });
+
+  it('should not validate when the POST body does not follow the given schema', function () {
+    let myAPI = _.assign({}, swaggerStub, {
+      paths: {
+        '/test': {
+          post: {
+            parameters: [{
+              name: 'body',
+              in: 'body',
+              required: true,
+              schema: {
+                type: 'object',
+                properties: {id: {type: 'integer'}},
+                required: ['id']
+              }
+            }],
+            responses: {'200': {description: 'no content'}}
+          }
+        }
+      }
+    });
+    return SwaggerParser.validate(myAPI)
+      .then((swaggerAPI) => {
+        server.use(middleware(null, swaggerAPI));
+        server.post('/test', (req, res) => res.send(200));
+        return request
+          .post('/test')
+          .send({no_id: 1})
+          .expect(400)
+      })
+  });
+
+  it('should validate when the POST body follows the given schema', function () {
+    let myAPI = _.assign({}, swaggerStub, {
+      paths: {
+        '/test': {
+          post: {
+            parameters: [{
+              name: 'body',
+              in: 'body',
+              required: true,
+              schema: {
+                type: 'object',
+                properties: {id: {type: 'integer'}},
+                required: ['id']
+              }
+            }],
+            responses: {'200': {description: 'no content'}}
+          }
+        }
+      }
+    });
+    return SwaggerParser.validate(myAPI)
+      .then((swaggerAPI) => {
+        server.use(middleware(null, swaggerAPI));
+        server.post('/test', (req, res) => res.send(200));
+        return request
+          .post('/test')
+          .send({id: 1})
+          .expect(200)
+      })
   });
 
 });
