@@ -4,11 +4,22 @@ const Ajv = require('ajv');
 const restify = require('restify-errors');
 const _ = require('lodash');
 const url = require('url');
+var util = require('util');
 
+function ValidationError(message, errors) {
+  restify.RestError.call(this, {
+    restCode: 'ValidationError',
+    statusCode: 400,
+    message: message,
+    constructorOpt: ValidationError
+  });
+  this.name = 'ValidationError';
+  this.body.errors = errors;
+}
+
+util.inherits(ValidationError, restify.RestError);
 const defaultErrorTransformer = (input, errors) => {
-  let result = new restify.BadRequestError('Validation error');
-  result.errors = errors;
-  return result;
+  return new ValidationError('Validation error', errors);
 };
 
 const defaultErrorResponder = (transformedErr, req, res, next) => {
@@ -71,7 +82,7 @@ function addSwaggerParametersToJsonSchema(currentSchema, parameters) {
 }
 
 function createJsonSchemaFromSwaggerParameters(pathParameters, operationParameters) {
-  let jsonSchema = {
+  let initialJsonSchema = {
     '$schema': 'http://json-schema.org/draft-04/schema#',
     type: 'object',
     properties: {
@@ -80,10 +91,8 @@ function createJsonSchemaFromSwaggerParameters(pathParameters, operationParamete
       params: {type: 'object', properties: {}}
     }
   };
-  let combinedSchema = addSwaggerParametersToJsonSchema(addSwaggerParametersToJsonSchema(jsonSchema, pathParameters),
+  return addSwaggerParametersToJsonSchema(addSwaggerParametersToJsonSchema(initialJsonSchema, pathParameters),
     operationParameters);
-  console.log(JSON.stringify(combinedSchema, null, 4));
-  return combinedSchema;
 }
 
 module.exports = function (options, swaggerApi) {
@@ -135,7 +144,7 @@ module.exports = function (options, swaggerApi) {
       query: _.assign({}, req.query),
       body: _.assign({}, req.body)
     };
-    console.log(JSON.stringify(dataToValidate, null, 4));
+    // console.log(JSON.stringify(dataToValidate, null, 4));
 
     if (!pathParameters && !operationParameters) {
       errorResponder(errorTransformer(dataToValidate), req, res, next);
@@ -149,13 +158,13 @@ module.exports = function (options, swaggerApi) {
       // instead we add a req.swagger which will contain query, body, 
 
       if (!dataIsValid) {
-        console.log(JSON.stringify(validator.errors, null, 4));
+        // console.log(JSON.stringify(validator.errors, null, 4));
         errorResponder(errorTransformer(dataToValidate, validator.errors), req, res, next);
         return;
       }
       // Make swaggerized parameters available
       _.assign(req.swagger, dataToValidate);
-      console.log(JSON.stringify(dataToValidate, null, 4));
+      // console.log(JSON.stringify(dataToValidate, null, 4));
       next();
     }
     catch (err) {

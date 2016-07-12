@@ -18,6 +18,15 @@ describe('middleware', function () {
   let server;
   let request;
 
+  function getRequestAsync(api, route) {
+    return SwaggerParser.validate(api)
+      .then((swaggerAPI) => {
+        server.use(middleware(null, swaggerAPI));
+        server.get(route, (req, res) => res.send(200));
+        return request
+      })
+  }
+
   beforeEach('starting restify server', function (done) {
     server = restify.createServer();
     // validation middleware requires query and body parser to be used,
@@ -52,46 +61,60 @@ describe('middleware', function () {
       .expect(400)
   });
 
-  it('should not validate when a required query parameter is missing', function () {
-    let myAPI = _.assign({}, swaggerStub, {
-      paths: {
-        '/test': {
-          get: {
-            parameters: [{name: 'test', type: 'integer', in: 'query', required: true}],
-            responses: {'200': {description: 'no content'}}
-          }
-        }
-      }
-    });
-    return SwaggerParser.validate(myAPI)
-      .then((swaggerAPI) => {
-        server.use(middleware(null, swaggerAPI));
-        server.get('/test', (req, res) => res.send(200));
-        return request
-          .get('/test?no_test=1')
-          .expect(400)
-      })
-  });
+  describe('validate query parameters', function () {
+    let request;
 
-  it('should validate when a required query parameter exists', function () {
-    let myAPI = _.assign({}, swaggerStub, {
-      paths: {
-        '/test': {
-          get: {
-            parameters: [{name: 'test', type: 'integer', in: 'query', required: true}],
-            responses: {'200': {description: 'no content'}}
+    beforeEach('', function () {
+      let myAPI = _.assign({}, swaggerStub, {
+        paths: {
+          '/test': {
+            get: {
+              parameters: [{name: 'test', type: 'integer', in: 'query', required: true}],
+              responses: {'200': {description: 'no content'}}
+            }
           }
         }
-      }
+      });
+      return getRequestAsync(myAPI, '/test')
+        .then((r) => { request = r })
     });
-    return SwaggerParser.validate(myAPI)
-      .then((swaggerAPI) => {
-        server.use(middleware(null, swaggerAPI));
-        server.get('/test', (req, res) => res.send(200));
-        return request
-          .get('/test?test=1')
-          .expect(200)
-      })
+
+    it('should not validate when a required query parameter is missing', function () {
+      return request
+        .get('/test?no_test=1')
+        .expect(400)
+    });
+
+    it('should validate when a required query parameter exists', function () {
+      return request
+        .get('/test?test=1')
+        .expect(200)
+    });
+
+    it('should not validate when a query parameter has the wrong type', function () {
+      return request
+        .get('/test?test=abc')
+        .expect(400, {
+          "code": "ValidationError",
+          "errors": [
+            {
+              "data": "abc",
+              "dataPath": ".query.test",
+              "keyword": "type",
+              "message": "should be integer",
+              "params": {
+                "type": "integer"
+              },
+              "parentSchema": {
+                "type": "integer"
+              },
+              "schema": "integer",
+              "schemaPath": "#/properties/query/properties/test/type"
+            }
+          ],
+          "message": "Validation error"
+        })
+    });
   });
 
   it('validates route params and query parameters at the same time', function () {
