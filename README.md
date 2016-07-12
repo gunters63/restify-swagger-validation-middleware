@@ -1,13 +1,17 @@
 # restify-swagger-validation-middleware
 Restify middleware for validating REST requests with swagger specifications
 
-Usage:
+Validates all query, route and body parameters according to the swagger definition.
+
+The library is not production-ready yet, consider this pre-alpha.
+
+*Usage:*
 
 This middleware requires the built-in restify plugins queryParse and bodyParser loaded before it, both with ````mapParams```` set to ````false````
 
 It also requires a valid de-referenced swagger 2.0 definition, you can use the module ````swagger-parser```` for this
 
-Example:
+*Example:*
 
     const restify = require('restify');
     const SwaggerParser = require('swagger-parser');
