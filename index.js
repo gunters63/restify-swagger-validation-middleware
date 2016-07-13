@@ -55,39 +55,35 @@ function addSwaggerParametersToJsonSchema(currentSchema, parameters) {
     let name = parameter.name;
     let _in = parameter.in;
     let required = parameter.required;
-    let operation;
-    let propertySchema;
     switch (_in) {
       case 'body':
         if (parameter.schema.$ref) {
           throw restify.InternalServerError('Swagger schema should be de-referenced')
         }
+        // We assume a swagger body schema already has a valid JSON schema format
         schema.properties.body = parameter.schema;
         break;
       case 'query':
       case 'path':
-        operation = (_in === 'query') ? schema.properties.query : schema.properties.params;
+        let operation = schema.properties[_in];
         // Pick the JSON compatible schema properties
-        propertySchema = _.pick(parameter, [
+        operation.properties[name] = _.pick(parameter, [
           'type', 'default', 'enum', 'multipleOf', 'format', 'maximum', 'exclusiveMaximum', 'minimum',
           'exclusiveMinimum', 'maxLength', 'minLength', 'pattern', 'maxItems', 'minItems', 'uniqueItems',
           'maxProperties', 'minProperties',
           'items', 'allOf', 'properties', 'additionalProperties' // Not sure yet about those
         ]);
-          operation.properties[name] = propertySchema;
+        if (required) {
+          if (operation.required) {
+            operation.required.push(name)
+          } else {
+            operation.required = [name]
+          }
+        }
         break;
       default:
         // Ignore header and formData (for now)
         break;
-    }
-    if (operation && propertySchema) {
-      if (required) {
-        if (operation.required) {
-          operation.required.push(name)
-        } else {
-          operation.required = [name]
-        }
-      }
     }
     return schema
   }, currentSchema);
@@ -100,11 +96,14 @@ function createJsonSchemaFromSwaggerParameters(pathParameters, operationParamete
     properties: {
       body: {type: 'object', properties: {}},
       query: {type: 'object', properties: {}},
-      params: {type: 'object', properties: {}}
+      path: {type: 'object', properties: {}}
     }
   };
-  return addSwaggerParametersToJsonSchema(addSwaggerParametersToJsonSchema(initialJsonSchema, pathParameters),
+  let jsonValidationSchema = addSwaggerParametersToJsonSchema(
+    addSwaggerParametersToJsonSchema(initialJsonSchema, pathParameters),
     operationParameters);
+  //console.log(JSON.stringify(jsonValidationSchema, null, 4));
+  return jsonValidationSchema
 }
 
 module.exports = function (options, swaggerApi) {
@@ -152,11 +151,11 @@ module.exports = function (options, swaggerApi) {
     // We have to make copies of all values because the validator will change the data to validate in-place 
     // (for settings defaults and type coercion).
     let dataToValidate = {
-      params: _.assign({}, req.params),
+      path: _.assign({}, req.params),
       query: _.assign({}, req.query),
       body: _.assign({}, req.body)
     };
-    // console.log(JSON.stringify(dataToValidate, null, 4));
+    //console.log(JSON.stringify(dataToValidate, null, 4));
 
     if (!pathParameters && !operationParameters) {
       errorResponder(errorTransformer(dataToValidate), req, res, next);
@@ -175,7 +174,10 @@ module.exports = function (options, swaggerApi) {
         return;
       }
       // Make swaggerized parameters available
-      _.assign(req.swagger, dataToValidate);
+      _.assign(req.swagger, dataToValidate, {
+        // Merge all path, query and body parameters into req.swagger.params
+        params: _.assign({}, dataToValidate.path, dataToValidate.query, dataToValidate.body)
+      });
       // console.log(JSON.stringify(dataToValidate, null, 4));
       next();
     }

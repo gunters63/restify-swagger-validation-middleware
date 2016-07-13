@@ -18,6 +18,18 @@ describe('middleware', function () {
   let server;
   let request;
 
+  let routeAndQueryAPI = _.assign({}, swaggerStub, {
+    paths: {
+      '/test/{id}': {
+        parameters: [{name: 'id', type: 'string', in: 'path', required: true}],
+        get: {
+          parameters: [{name: 'test', type: 'integer', in: 'query', required: true}],
+          responses: {'200': {description: 'no content'}}
+        }
+      }
+    }
+  });
+  
   function getRequestAsync(api, route, reqChecker) {
     route = route || '/test';
     reqChecker = reqChecker || () => {};
@@ -25,8 +37,13 @@ describe('middleware', function () {
       .then((swaggerAPI) => {
         server.use(middleware(null, swaggerAPI));
         server.get(route, (req, res) => {
-          reqChecker(req);
-          return res.send(200)
+          try {
+            reqChecker(req);
+            return res.send(200)
+          }
+          catch (err) {
+            return res.send(err)
+          }
         });
         return request
       })
@@ -90,6 +107,31 @@ describe('middleware', function () {
     });
   });
 
+  describe('req.swagger', function() {
+    it('should contain the api', function() {
+      return getRequestAsync(routeAndQueryAPI, '/test/:id', (req) => {
+        expect(req.swagger.api).to.exist;
+      })
+        .then((request) => {
+          return request
+            .get('/test/1?test=2')
+            .expect(200)
+        })
+    });
+
+    it.only('should merge query and path parameters into param', function () {
+      return getRequestAsync(routeAndQueryAPI, '/test/:id', (req) => {
+        expect(req.swagger.params).to.have.property('id', '1');
+        expect(req.swagger.params).to.have.property('test', 2);
+      })
+        .then((request) => {
+          return request
+            .get('/test/1?test=2')
+            .expect(200)
+        })
+    });
+  });
+  
   describe('validate query parameters', function () {
     let integerAPI = _.assign({}, swaggerStub, {
       paths: {
@@ -118,7 +160,29 @@ describe('middleware', function () {
         .then((request) => {
           return request
             .get('/test?no_test=1')
-            .expect(400)
+            .expect(400, {
+              "code": "ValidationError",
+              "errors": [
+                {
+                  "data": {
+                    "no_test": "1"
+                  },
+                  "dataPath": ".query",
+                  "keyword": "required",
+                  "message": "should have required property 'test'",
+                  "params": {
+                    "missingProperty": "test"
+                  },
+                  "schema": {
+                    "test": {
+                      "type": "integer"
+                    }
+                  },
+                  "schemaPath": "#/properties/query/required"
+                }
+              ],
+              "message": "Validation error"
+            })
         })
     });
 
@@ -184,18 +248,7 @@ describe('middleware', function () {
   });
 
   it('validates route params and query parameters at the same time', function () {
-    let myAPI = _.assign({}, swaggerStub, {
-      paths: {
-        '/test/{id}': {
-          parameters: [{name: 'id', type: 'string', in: 'path', required: true}],
-          get: {
-            parameters: [{name: 'test', type: 'integer', in: 'query', required: true}],
-            responses: {'200': {description: 'no content'}}
-          }
-        }
-      }
-    });
-    return SwaggerParser.validate(myAPI)
+    return SwaggerParser.validate(routeAndQueryAPI)
       .then((swaggerAPI) => {
         server.use(middleware(null, swaggerAPI));
         server.get('/test/:id', (req, res) => res.send(200));
@@ -266,5 +319,4 @@ describe('middleware', function () {
           .expect(200)
       })
   });
-
 });
