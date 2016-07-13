@@ -11,6 +11,15 @@ This middleware requires the built-in restify plugins queryParse and bodyParser 
 
 It also requires a valid de-referenced swagger 2.0 definition, you can use the module ````swagger-parser```` for this
 
+The middleware will create a swagger property on the restify request.
+The property will contain:
+
+- api: contains the parsed swaggerAPI
+- query: contains all query parameters, type-coerced and with defaults
+- path: contains all route path parameters, type-coerced and with defaults
+- body: contains all body parameters, type-coerced and with defaults
+- params: contains all query, path and body parameters merged together 
+
 *Example:*
 
     const restify = require('restify');
@@ -36,6 +45,7 @@ It also requires a valid de-referenced swagger 2.0 definition, you can use the m
         server = restify.createServer();
         // validation middleware requires query and body parser to be used,
         // both have to disable mapping their properties into req.params
+        // so req.params only contains the route path parameters.
         server.use(restify.queryParser({mapParams: false}));
         server.use(restify.bodyParser({mapParams: false}));
         server.use(middleware(options, swaggerAPI));

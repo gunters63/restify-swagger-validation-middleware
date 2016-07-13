@@ -32,7 +32,7 @@ describe('middleware', function () {
   
   function getRequestAsync(api, route, reqChecker) {
     route = route || '/test';
-    reqChecker = reqChecker || () => {};
+    reqChecker = reqChecker || function() {};
     return SwaggerParser.validate(api)
       .then((swaggerAPI) => {
         server.use(middleware(null, swaggerAPI));
@@ -119,7 +119,7 @@ describe('middleware', function () {
         })
     });
 
-    it.only('should merge query and path parameters into param', function () {
+    it('should merge query and path parameters into param', function () {
       return getRequestAsync(routeAndQueryAPI, '/test/:id', (req) => {
         expect(req.swagger.params).to.have.property('id', '1');
         expect(req.swagger.params).to.have.property('test', 2);
