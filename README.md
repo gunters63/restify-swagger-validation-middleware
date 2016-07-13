@@ -19,11 +19,13 @@ The property will contain:
 - path: contains all route path parameters, type-coerced and with defaults
 - body: contains all body parameters, type-coerced and with defaults
 - params: contains all query, path and body parameters merged together 
+- the middleware will NOT change existing values in req.query, req.params and req.body.
 
 *Example:*
 
     const restify = require('restify');
     const SwaggerParser = require('swagger-parser');
+    const restifySwaggerValidationMiddleware = require('restify-swagger-validation-middleware');
 
     // In a real world project you would read your api from the file system
     let api = {
@@ -48,7 +50,7 @@ The property will contain:
         // so req.params only contains the route path parameters.
         server.use(restify.queryParser({mapParams: false}));
         server.use(restify.bodyParser({mapParams: false}));
-        server.use(middleware(options, swaggerAPI));
+        server.use(restifySwaggerValidationMiddleware(options, swaggerAPI));
     
         server.listen(PORT, '127.0.0.1', () => {
            // your code

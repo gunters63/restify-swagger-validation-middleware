@@ -106,10 +106,9 @@ function createJsonSchemaFromSwaggerParameters(pathParameters, operationParamete
   return jsonValidationSchema
 }
 
-module.exports = function (options, swaggerApi) {
+module.exports = function (swaggerApi, options) {
   // Use npm module swagger-parser to get a validated and de-referenced swagger object
   options = options || {};
-  swaggerApi = swaggerApi || {};
   let ajvOptions = options.ajv || {
       v5: true,
       allErrors: true,
@@ -133,38 +132,38 @@ module.exports = function (options, swaggerApi) {
 
   return function restifyMiddleware(req, res, next) {
 
-    req.swagger = req.swagger || {};
-    req.swagger.api = swaggerApi;
-
-    // Todo: Respect swaggers basePath
-    let swaggerPath = convertRestifyRouteToSwaggerOperationPath(req.route.path);
-
-    // 'parameters' can be found:
-    // - under the root object (where they can be linked to with a $ref which should be already de-referenced)
-    // - under 'path' (then its valid for every operation under that path)
-    // - under 'operation', those override parameters with the same name in the parent path item object
-    let pathParameterKey = `paths[${swaggerPath}].parameters`;
-    let operationParameterKey = `paths[${swaggerPath}][${req.route.method.toLowerCase()}].parameters`;
-    let pathParameters = _.get(swaggerApi, pathParameterKey);
-    let operationParameters = _.get(swaggerApi, operationParameterKey);
-
-    // We assume we have the standard restify middlewares queryParser and bodyParser loaded, both with {mapParams: false}.
-    // So req.params will contain all route path parameters, req.query all query parameters, and req.body all body.parameters.
-    // We have to make copies of all values because the validator will change the data to validate in-place 
-    // (for settings defaults and type coercion).
-    // Route path parameters from req.params will be stored in 'path' because we want to merge all parameters into params.
-    let dataToValidate = {
-      path: _.assign({}, req.params),
-      query: _.assign({}, req.query),
-      body: _.assign({}, req.body)
-    };
-    // console.log(JSON.stringify(dataToValidate, null, 4));
-
-    if (!pathParameters && !operationParameters) {
-      errorResponder(errorTransformer(dataToValidate), req, res, next);
-      return;
-    }
     try {
+      req.swagger = req.swagger || {};
+      req.swagger.api = swaggerApi;
+
+      // Todo: Respect swaggers basePath
+      let swaggerPath = convertRestifyRouteToSwaggerOperationPath(req.route.path);
+
+      // 'parameters' can be found:
+      // - under the root object (where they can be linked to with a $ref which should be already de-referenced)
+      // - under 'path' (then its valid for every operation under that path)
+      // - under 'operation', those override parameters with the same name in the parent path item object
+      let pathParameterKey = `paths[${swaggerPath}].parameters`;
+      let operationParameterKey = `paths[${swaggerPath}][${req.route.method.toLowerCase()}].parameters`;
+      let pathParameters = _.get(swaggerApi, pathParameterKey);
+      let operationParameters = _.get(swaggerApi, operationParameterKey);
+
+      // We assume we have the standard restify middlewares queryParser and bodyParser loaded, both with {mapParams: false}.
+      // So req.params will contain all route path parameters, req.query all query parameters, and req.body all body.parameters.
+      // We have to make copies of all values because the validator will change the data to validate in-place 
+      // (for settings defaults and type coercion).
+      // Route path parameters from req.params will be stored in 'path' because we want to merge all parameters into params.
+      let dataToValidate = {
+        path: _.assign({}, req.params),
+        query: _.assign({}, req.query),
+        body: _.assign({}, req.body)
+      };
+      // console.log(JSON.stringify(dataToValidate, null, 4));
+
+      if (!pathParameters && !operationParameters) {
+        errorResponder(errorTransformer(dataToValidate), req, res, next);
+        return;
+      }
       // Lazily create the JSON schema and validator and cache it
       let validator = memoizedValidator(operationParameterKey, pathParameters, operationParameters);
       let dataIsValid = validator(dataToValidate);

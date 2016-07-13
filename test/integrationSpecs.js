@@ -35,7 +35,7 @@ describe('middleware', function () {
     reqChecker = reqChecker || function() {};
     return SwaggerParser.validate(api)
       .then((swaggerAPI) => {
-        server.use(middleware(null, swaggerAPI));
+        server.use(middleware(swaggerAPI));
         server.get(route, (req, res) => {
           try {
             reqChecker(req);
@@ -220,7 +220,7 @@ describe('middleware', function () {
         });
     });
 
-    it('should not validate when a query parameter has the wrong enum', function () {
+    it.only('should not validate when a query parameter has the wrong enum', function () {
       return getRequestAsync(enumAPI)
         .then((request) => {
           return request
@@ -250,7 +250,7 @@ describe('middleware', function () {
   it('validates route params and query parameters at the same time', function () {
     return SwaggerParser.validate(routeAndQueryAPI)
       .then((swaggerAPI) => {
-        server.use(middleware(null, swaggerAPI));
+        server.use(middleware(swaggerAPI));
         server.get('/test/:id', (req, res) => res.send(200));
         return request
           .get('/test/12?test=1')
@@ -280,7 +280,7 @@ describe('middleware', function () {
     });
     return SwaggerParser.validate(myAPI)
       .then((swaggerAPI) => {
-        server.use(middleware(null, swaggerAPI));
+        server.use(middleware(swaggerAPI));
         server.post('/test', (req, res) => res.send(200));
         return request
           .post('/test')
@@ -311,7 +311,7 @@ describe('middleware', function () {
     });
     return SwaggerParser.validate(myAPI)
       .then((swaggerAPI) => {
-        server.use(middleware(null, swaggerAPI));
+        server.use(middleware(swaggerAPI));
         server.post('/test', (req, res) => res.send(200));
         return request
           .post('/test')
