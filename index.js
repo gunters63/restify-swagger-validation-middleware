@@ -26,6 +26,7 @@ function ValidationError(message, errors) {
 }
 
 util.inherits(ValidationError, restify.RestError);
+
 const defaultErrorTransformer = (input, errors) => {
   return new ValidationError('Validation error', errors);
 };
@@ -82,7 +83,7 @@ function addSwaggerParametersToJsonSchema(currentSchema, parameters) {
         }
         break;
       default:
-        // Ignore header and formData (for now)
+        // Ignore header and formData for now
         break;
     }
     return schema
@@ -100,9 +101,8 @@ function createJsonSchemaFromSwaggerParameters(pathParameters, operationParamete
     }
   };
   let jsonValidationSchema = addSwaggerParametersToJsonSchema(
-    addSwaggerParametersToJsonSchema(initialJsonSchema, pathParameters),
-    operationParameters);
-  //console.log(JSON.stringify(jsonValidationSchema, null, 4));
+    addSwaggerParametersToJsonSchema(initialJsonSchema, pathParameters), operationParameters);
+  // console.log(JSON.stringify(jsonValidationSchema, null, 4));
   return jsonValidationSchema
 }
 
@@ -125,6 +125,7 @@ module.exports = function (options, swaggerApi) {
   let ajv = new Ajv(ajvOptions);
 
   function createJsonValidatorFromSwaggerParameters(key, pathParameters, operationParameters) {
+    // key is used as hash key in _.memoize 
     return ajv.compile(createJsonSchemaFromSwaggerParameters(pathParameters, operationParameters));
   }
 
@@ -138,24 +139,26 @@ module.exports = function (options, swaggerApi) {
     // Todo: Respect swaggers basePath
     let swaggerPath = convertRestifyRouteToSwaggerOperationPath(req.route.path);
 
-    // 'parameters' can be found under the root object (where they can be linked to with a $ref, should be already de-referenced),
-    // under 'path' (then its valid for every operation under that path)
-    // and under 'operation', those override parameters with the same name in the parent path item object
+    // 'parameters' can be found:
+    // - under the root object (where they can be linked to with a $ref which should be already de-referenced)
+    // - under 'path' (then its valid for every operation under that path)
+    // - under 'operation', those override parameters with the same name in the parent path item object
     let pathParameterKey = `paths[${swaggerPath}].parameters`;
     let operationParameterKey = `paths[${swaggerPath}][${req.route.method.toLowerCase()}].parameters`;
     let pathParameters = _.get(swaggerApi, pathParameterKey);
     let operationParameters = _.get(swaggerApi, operationParameterKey);
 
     // We assume we have the standard restify middlewares queryParser and bodyParser loaded, both with {mapParams: false}.
-    // So req.params will contain all route parameters, req.query all query parameters, and req.body all body.parameters.
+    // So req.params will contain all route path parameters, req.query all query parameters, and req.body all body.parameters.
     // We have to make copies of all values because the validator will change the data to validate in-place 
     // (for settings defaults and type coercion).
+    // Route path parameters from req.params will be stored in 'path' because we want to merge all parameters into params.
     let dataToValidate = {
       path: _.assign({}, req.params),
       query: _.assign({}, req.query),
       body: _.assign({}, req.body)
     };
-    //console.log(JSON.stringify(dataToValidate, null, 4));
+    // console.log(JSON.stringify(dataToValidate, null, 4));
 
     if (!pathParameters && !operationParameters) {
       errorResponder(errorTransformer(dataToValidate), req, res, next);
@@ -165,8 +168,9 @@ module.exports = function (options, swaggerApi) {
       // Lazily create the JSON schema and validator and cache it
       let validator = memoizedValidator(operationParameterKey, pathParameters, operationParameters);
       let dataIsValid = validator(dataToValidate);
-      // We will add parameter defaults and type coercion, but we don't want to modify the existing parameters,
-      // instead we add a req.swagger which will contain query, body, 
+      // We will add parameter defaults and do type coercion on dataToValidate,
+      // but we don't want to modify the existing parameters,
+      // instead we add a req.swagger which will contain all query, body and route path parameters 
 
       if (!dataIsValid) {
         // console.log(JSON.stringify(validator.errors, null, 4));
