@@ -18,12 +18,16 @@ describe('middleware', function () {
   let server;
   let request;
 
-  function getRequestAsync(api, route) {
+  function getRequestAsync(api, route, reqChecker) {
     route = route || '/test';
+    reqChecker = reqChecker || () => {};
     return SwaggerParser.validate(api)
       .then((swaggerAPI) => {
         server.use(middleware(null, swaggerAPI));
-        server.get(route, (req, res) => res.send(200));
+        server.get(route, (req, res) => {
+          reqChecker(req);
+          return res.send(200)
+        });
         return request
       })
   }
@@ -60,6 +64,30 @@ describe('middleware', function () {
     return request
       .get('/test')
       .expect(400)
+  });
+
+  describe('defaults', function () {
+    let defaultAPI = _.assign({}, swaggerStub, {
+      paths: {
+        '/test': {
+          get: {
+            parameters: [{name: 'test', type: 'integer', in: 'query', default: 123}],
+            responses: {'200': {description: 'no content'}}
+          }
+        }
+      }
+    });
+
+    it('should set a default', function () {
+      return getRequestAsync(defaultAPI, '/test', (req) => {
+        expect(req.swagger.query.test).to.equal(123)
+      })
+        .then((request) => {
+          return request
+            .get('/test')
+            .expect(200)
+        })
+    });
   });
 
   describe('validate query parameters', function () {
