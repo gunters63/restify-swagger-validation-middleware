@@ -4,7 +4,15 @@ const Ajv = require('ajv');
 const restify = require('restify-errors');
 const _ = require('lodash');
 const url = require('url');
-var util = require('util');
+const util = require('util');
+
+_.mixin({
+  collectionOmit: function (collection, keys) {
+    return _.map(collection, function (entry) {
+      return _.omit(entry, keys);
+    });
+  }
+});
 
 function ValidationError(message, errors) {
   restify.RestError.call(this, {
@@ -14,7 +22,7 @@ function ValidationError(message, errors) {
     constructorOpt: ValidationError
   });
   this.name = 'ValidationError';
-  this.body.errors = errors;
+  this.body.errors = _.collectionOmit(errors, ['parentSchema']);
 }
 
 util.inherits(ValidationError, restify.RestError);
@@ -59,10 +67,14 @@ function addSwaggerParametersToJsonSchema(currentSchema, parameters) {
       case 'query':
       case 'path':
         operation = (_in === 'query') ? schema.properties.query : schema.properties.params;
-        propertySchema = {
-          type: parameter.type
-        };
-        operation.properties[name] = propertySchema;
+        // Pick the JSON compatible schema properties
+        propertySchema = _.pick(parameter, [
+          'type', 'default', 'enum', 'multipleOf', 'format', 'maximum', 'exclusiveMaximum', 'minimum',
+          'exclusiveMinimum', 'maxLength', 'minLength', 'pattern', 'maxItems', 'minItems', 'uniqueItems',
+          'maxProperties', 'minProperties',
+          'items', 'allOf', 'properties', 'additionalProperties' // Not sure yet about those
+        ]);
+          operation.properties[name] = propertySchema;
         break;
       default:
         // Ignore header and formData (for now)
