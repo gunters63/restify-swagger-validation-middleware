@@ -60,7 +60,7 @@ A typical validation error response body will look like this:
     }
 
 *Example usage of middleware:*
-
+```js
     const restify = require('restify');
     const SwaggerParser = require('swagger-parser');
     const restifySwaggerValidationMiddleware = require('restify-swagger-validation-middleware');
@@ -94,7 +94,7 @@ A typical validation error response body will look like this:
            // your code
         })
       })
-
+```
 *Notes:*
 
 - The middleware could easily be ported to express I guess as it has no direct dependency on restify and middlewares look 
