@@ -94,3 +94,11 @@ A typical validation error response body will look like this:
            // your code
         })
       })
+
+*Notes:*
+
+- The middleware could easily be ported to express I guess as it has no direct dependency on restify and middlewares look 
+quite the same in restify and express. What hat to change is the validation error handling as that needs restify-errors.
+- Also, it should be easy to use the same mechanism (mainly delegating everything to avj) with RAML instead of swagger,
+it should be even easier because RAML is much closer to the JSON schema standard and body and query parameters are not
+handled differently like in swagger.
