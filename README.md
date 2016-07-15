@@ -1,5 +1,5 @@
 # restify-swagger-validation-middleware
-Restify middleware for validating REST requests with swagger specifications
+**Restify middleware for validating REST requests with swagger specifications.**
 
 Validates all query, route and body parameters according to the swagger definition.
 
@@ -7,16 +7,17 @@ This library is not production-ready yet, consider this pre-alpha.
 
 *How it works:*
 
-This middleware requires the built-in restify plugins queryParse and bodyParser loaded before it, both with ````mapParams```` set to ````false````
+This middleware requires the built-in restify plugins queryParse and bodyParser loaded before it, both with ````mapParams```` set to ````false````.
 
 It also requires a valid de-referenced swagger 2.0 definition, you can use the module ````swagger-parser```` for this.
 
 For every incoming request it will look up the swagger definition for the parameters for the active route and operation 
 (swagger allows parameters on the whole route and on specific operations on the route, the middleware will merge both).
 It will then create a JSON schema which validates all query, body and route parameters at once. It then compiles this 
-schema (using the great ````ajv```` libary) to a javascript function which validates the data from the request.
-````ajv``` will also handle settings defaults and type coercion.   
+schema (using the great ````ajv```` library) to a javascript function which validates the data from the request. The 
+generated function for this route and operatinm is cached through ````lodash.memoize()````.
 
+````ajv```` will also handle settings defaults and type coercion.   
 
 The middleware will create a swagger object on the restify request: ````req.swagger````.
 
