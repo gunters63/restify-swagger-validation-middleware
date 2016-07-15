@@ -1,12 +1,11 @@
 {
   "name": "restify-swagger-validation-middleware",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Restify middleware for validating REST requests with swagger specifications",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/.bin/mocha --globals setImmediate,clearImmediate --check-leaks --colors -t 20000 --reporter spec ./test",
-    "coverage": "./node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha -- -t 20000 --ui tdd ./test",
-    "lint": "./node_modules/.bin/eslint index.js ./test"
+    "test": "NODE_ENV=test ./node_modules/.bin/mocha --globals setImmediate,clearImmediate --check-leaks --colors -t 20000 --reporter spec ./test",
+    "coverage": "NODE_ENV=test ./node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha -- -t 20000 --ui tdd ./test"
   },
   "engineStrict": true,
   "engines": {
@@ -38,7 +37,6 @@
   },
   "devDependencies": {
     "chai": "^3.5.0",
-    "eslint": "^3.0.1",
     "istanbul": "^0.4.4",
     "mocha": "^2.5.3",
     "restify": "^4.1.1",

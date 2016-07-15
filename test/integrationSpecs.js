@@ -220,7 +220,7 @@ describe('middleware', function () {
         });
     });
 
-    it.only('should not validate when a query parameter has the wrong enum', function () {
+    it('should not validate when a query parameter has the wrong enum', function () {
       return getRequestAsync(enumAPI)
         .then((request) => {
           return request

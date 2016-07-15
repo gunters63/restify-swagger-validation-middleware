@@ -22,6 +22,7 @@ function ValidationError(message, errors) {
     constructorOpt: ValidationError
   });
   this.name = 'ValidationError';
+  // We want to include the data which failed validation, so we use ajv's verbose mode, but omit the parent schema here
   this.body.errors = _.collectionOmit(errors, ['parentSchema']);
 }
 
